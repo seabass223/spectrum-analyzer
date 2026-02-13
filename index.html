@@ -578,6 +578,7 @@
         let splitterNode = null;
         let analyserLeft = null;
         let analyserRight = null;
+        let gainNode = null;
 
         // Audio Element
         let audioElement = null;
@@ -597,6 +598,7 @@
         const FFT_SIZE = 2048;
         let fallRate = 5;
         let isSeeking = false;
+        let currentGain = 0; // dB
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', init);
@@ -609,6 +611,7 @@
             setupFileInput();
             setupControls();
             setupSlider();
+            setupGainKnob();
             setupProgressBar();
         }
 
@@ -799,6 +802,10 @@
             // Create source from audio element
             sourceNode = audioContext.createMediaElementSource(audioElement);
 
+            // Create gain node for volume control
+            gainNode = audioContext.createGain();
+            gainNode.gain.value = 1.0; // 0dB = unity gain
+
             // Create channel splitter (stereo = 2 channels)
             splitterNode = audioContext.createChannelSplitter(2);
 
@@ -813,12 +820,13 @@
             analyserRight.smoothingTimeConstant = 0.8;
 
             // Connect the audio graph
-            sourceNode.connect(splitterNode);
+            sourceNode.connect(gainNode);
+            gainNode.connect(splitterNode);
             splitterNode.connect(analyserLeft, 0);  // Left channel
             splitterNode.connect(analyserRight, 1); // Right channel
 
-            // Connect source to destination for playback
-            sourceNode.connect(audioContext.destination);
+            // Connect gain node to destination for playback
+            gainNode.connect(audioContext.destination);
         }
 
         function getLogarithmicBands(analyser) {
@@ -1037,6 +1045,109 @@
                 fallRate = parseInt(e.target.value);
                 valueDisplay.textContent = fallRate;
                 updateKnobRotation(fallRate);
+            });
+        }
+
+        function setupGainKnob() {
+            const knob = document.getElementById('gain-knob');
+            const knobIndicator = knob.querySelector('.knob-indicator');
+            const valueDisplay = knob.parentElement.nextElementSibling;
+            let isDragging = false;
+            let lastAngle = null;
+
+            // Gain range: -30dB to +10dB
+            const MIN_GAIN_DB = -30;
+            const MAX_GAIN_DB = 10;
+
+            // Convert dB to linear gain
+            function dbToLinear(db) {
+                return Math.pow(10, db / 20);
+            }
+
+            // Update knob rotation and gain value
+            function updateKnobRotation(gainDb) {
+                const minAngle = -135;
+                const maxAngle = 135;
+                const normalizedValue = (gainDb - MIN_GAIN_DB) / (MAX_GAIN_DB - MIN_GAIN_DB);
+                const angle = minAngle + normalizedValue * (maxAngle - minAngle);
+                knobIndicator.style.transform = `rotate(${angle}deg)`;
+
+                // Update display
+                const displayValue = gainDb >= 0 ? `+${gainDb}` : gainDb;
+                valueDisplay.textContent = `${displayValue}dB`;
+
+                // Update audio gain if gainNode exists
+                if (gainNode) {
+                    gainNode.gain.value = dbToLinear(gainDb);
+                }
+            }
+
+            // Calculate angle from knob center to mouse position
+            function getAngleFromCenter(e, rect) {
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                const deltaX = e.clientX - centerX;
+                const deltaY = e.clientY - centerY;
+                return Math.atan2(deltaY, deltaX) * (180 / Math.PI) - 90;
+            }
+
+            // Normalize angle difference to handle wraparound
+            function getAngleDelta(angle1, angle2) {
+                let delta = angle2 - angle1;
+                while (delta > 180) delta -= 360;
+                while (delta < -180) delta += 360;
+                return delta;
+            }
+
+            // Initialize knob position at 0dB
+            updateKnobRotation(currentGain);
+
+            // Double-click to reset to 0dB
+            knob.addEventListener('dblclick', (e) => {
+                currentGain = 0;
+                updateKnobRotation(currentGain);
+                e.preventDefault();
+            });
+
+            // Mouse events for orbital knob control
+            knob.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                const rect = knob.getBoundingClientRect();
+                lastAngle = getAngleFromCenter(e, rect);
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+
+                const rect = knob.getBoundingClientRect();
+                const currentAngle = getAngleFromCenter(e, rect);
+
+                if (lastAngle !== null) {
+                    const angleDelta = getAngleDelta(lastAngle, currentAngle);
+
+                    // Convert angle change to dB change
+                    const sensitivity = 0.2; // Adjust for gain control feel
+                    const dbChange = angleDelta * sensitivity;
+
+                    if (Math.abs(dbChange) > 0.1) {
+                        const newGain = Math.max(MIN_GAIN_DB, Math.min(MAX_GAIN_DB, currentGain + dbChange));
+
+                        if (Math.abs(newGain - currentGain) > 0.1) {
+                            currentGain = Math.round(newGain * 10) / 10; // Round to 0.1 dB
+                            updateKnobRotation(currentGain);
+                        }
+                    }
+                }
+
+                lastAngle = currentAngle;
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    lastAngle = null;
+                }
             });
         }
 
