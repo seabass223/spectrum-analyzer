@@ -344,17 +344,32 @@
         .control-panel {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            gap: 40px;
+            align-items: flex-start;
+            gap: 20px;
             padding: 0 20px;
         }
 
         .control-section {
-            flex: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 15px;
+        }
+
+        .control-section:nth-child(1) {
+            flex: 0 0 15%;
+        }
+
+        .control-section:nth-child(2) {
+            flex: 0 0 15%;
+        }
+
+        .control-section:nth-child(3) {
+            flex: 0 0 30%;
+        }
+
+        .control-section:nth-child(4) {
+            flex: 0 0 30%;
         }
 
         .control-label {
@@ -652,7 +667,7 @@
                 </div>
             </div>
 
-            <!-- Placeholder for symmetry -->
+            <!-- Monitor Control -->
             <div class="control-section">
                 <div class="control-label">Monitor</div>
                 <div class="knob-container">
