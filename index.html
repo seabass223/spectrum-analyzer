@@ -223,6 +223,7 @@
         .channel {
             flex: 1;
             max-width: 550px;
+            position: relative;
         }
 
         .channel h3 {
@@ -506,6 +507,71 @@
             font-weight: bold;
             letter-spacing: 1px;
         }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            background: #1a1a1a;
+            border: 2px solid #2a2a2a;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+            transition: all 0.3s ease;
+        }
+
+        .toggle-switch::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 22px;
+            height: 22px;
+            background: radial-gradient(circle at 30% 30%, #4a4a4a, #2a2a2a);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+        }
+
+        .toggle-switch.active::before {
+            transform: translateX(30px);
+            background: radial-gradient(circle at 30% 30%, #ffaa00, #cc8800);
+            box-shadow: 0 2px 4px rgba(255, 170, 0, 0.6);
+        }
+
+        .toggle-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 8px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #666;
+        }
+
+        .toggle-labels span.active {
+            color: #ffaa00;
+            font-weight: bold;
+        }
+
+        /* Canvas for oscilloscope */
+        .scope-canvas {
+            width: 100%;
+            height: 300px;
+            display: none;
+            background: #000000;
+            border: 1px solid #1a1a1a;
+            border-radius: 3px;
+        }
+
+        .scope-canvas.active {
+            display: block;
+        }
+
+        .bars-container.hidden {
+            display: none;
+        }
     </style>
 </head>
 
@@ -540,10 +606,12 @@
                 <div id="left-channel" class="channel">
                     <h3>Left Channel</h3>
                     <div class="bars-container"></div>
+                    <canvas class="scope-canvas" width="550" height="300"></canvas>
                 </div>
                 <div id="right-channel" class="channel">
                     <h3>Right Channel</h3>
                     <div class="bars-container"></div>
+                    <canvas class="scope-canvas" width="550" height="300"></canvas>
                 </div>
             </div>
         </div>
@@ -560,6 +628,16 @@
                 </div>
                 <div class="knob-value" id="fall-rate-value">5</div>
                 <input type="range" id="fall-rate" min="1" max="20" value="5" style="display: none;">
+            </div>
+
+            <!-- Mode Toggle -->
+            <div class="control-section">
+                <div class="control-label">Display Mode</div>
+                <div class="toggle-switch" id="mode-toggle"></div>
+                <div class="toggle-labels">
+                    <span id="label-spectrum" class="active">Spectrum</span>
+                    <span id="label-scope">Scope</span>
+                </div>
             </div>
 
             <!-- Transport Controls -->
@@ -620,6 +698,11 @@
         let fallRate = 5;
         let isSeeking = false;
         let currentGain = 0; // dB
+        let displayMode = 'spectrum'; // 'spectrum' or 'scope'
+
+        // Canvas contexts for oscilloscope
+        let canvasLeftCtx = null;
+        let canvasRightCtx = null;
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', init);
@@ -634,6 +717,8 @@
             setupSlider();
             setupGainKnob();
             setupProgressBar();
+            setupModeToggle();
+            initCanvases();
         }
 
         function calculateFrequencyRanges() {
@@ -930,6 +1015,66 @@
             updateTooltip();
         }
 
+        function animateScope() {
+            animationId = requestAnimationFrame(animateScope);
+
+            // Get time domain data
+            const bufferLength = analyserLeft.fftSize;
+            const leftDataArray = new Uint8Array(bufferLength);
+            const rightDataArray = new Uint8Array(bufferLength);
+
+            analyserLeft.getByteTimeDomainData(leftDataArray);
+            analyserRight.getByteTimeDomainData(rightDataArray);
+
+            // Draw left channel
+            drawScope(canvasLeftCtx, leftDataArray);
+            // Draw right channel
+            drawScope(canvasRightCtx, rightDataArray);
+        }
+
+        function drawScope(ctx, dataArray) {
+            const width = ctx.canvas.width;
+            const height = ctx.canvas.height;
+
+            // Clear canvas
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, width, height);
+
+            // Draw grid lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 10; i++) {
+                const y = (height / 10) * i;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+
+            // Draw waveform
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#ffaa00';
+            ctx.beginPath();
+
+            const sliceWidth = width / dataArray.length;
+            let x = 0;
+
+            for (let i = 0; i < dataArray.length; i++) {
+                const v = dataArray[i] / 128.0;
+                const y = (v * height) / 2;
+
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+
+                x += sliceWidth;
+            }
+
+            ctx.stroke();
+        }
+
         function updateBars(containerId, newValues, currentHeights) {
             const bars = document.querySelectorAll(`#${containerId} .bars-container .bar`);
             const containerHeight = 280; // Max height in pixels
@@ -981,7 +1126,13 @@
                 audioContext.resume();
             }
             audioElement.play();
-            animate();
+
+            // Start appropriate animation based on mode
+            if (displayMode === 'spectrum') {
+                animate();
+            } else {
+                animateScope();
+            }
         }
 
         function pause() {
@@ -1043,6 +1194,15 @@
 
             // Initialize knob position
             updateKnobRotation(parseInt(slider.value));
+
+            // Double-click to reset to default value (5)
+            knob.addEventListener('dblclick', (e) => {
+                slider.value = 5;
+                fallRate = 5;
+                valueDisplay.textContent = fallRate;
+                updateKnobRotation(5);
+                e.preventDefault();
+            });
 
             // Mouse events for orbital knob control
             knob.addEventListener('mousedown', (e) => {
@@ -1228,6 +1388,65 @@
             document.addEventListener('mouseup', () => {
                 isSeeking = false;
             });
+        }
+
+        function setupModeToggle() {
+            const toggle = document.getElementById('mode-toggle');
+            const labelSpectrum = document.getElementById('label-spectrum');
+            const labelScope = document.getElementById('label-scope');
+
+            toggle.addEventListener('click', () => {
+                displayMode = displayMode === 'spectrum' ? 'scope' : 'spectrum';
+
+                // Update toggle visual
+                toggle.classList.toggle('active');
+
+                // Update labels
+                labelSpectrum.classList.toggle('active');
+                labelScope.classList.toggle('active');
+
+                // Switch display mode
+                switchDisplayMode();
+            });
+        }
+
+        function initCanvases() {
+            const leftCanvas = document.querySelector('#left-channel .scope-canvas');
+            const rightCanvas = document.querySelector('#right-channel .scope-canvas');
+
+            canvasLeftCtx = leftCanvas.getContext('2d');
+            canvasRightCtx = rightCanvas.getContext('2d');
+        }
+
+        function switchDisplayMode() {
+            const barsContainers = document.querySelectorAll('.bars-container');
+            const scopeCanvases = document.querySelectorAll('.scope-canvas');
+
+            if (displayMode === 'spectrum') {
+                // Show bars, hide canvases
+                barsContainers.forEach(container => container.classList.remove('hidden'));
+                scopeCanvases.forEach(canvas => canvas.classList.remove('active'));
+
+                // Restart spectrum animation
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+                if (audioElement && !audioElement.paused) {
+                    animate();
+                }
+            } else {
+                // Hide bars, show canvases
+                barsContainers.forEach(container => container.classList.add('hidden'));
+                scopeCanvases.forEach(canvas => canvas.classList.add('active'));
+
+                // Restart scope animation
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+                if (audioElement && !audioElement.paused) {
+                    animateScope();
+                }
+            }
         }
 
         function setupAudioEvents() {
