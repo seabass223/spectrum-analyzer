@@ -1137,8 +1137,10 @@
             const width = ctx.canvas.width;
             const height = ctx.canvas.height;
 
-            // Clear canvas
-            ctx.fillStyle = '#000000';
+            // Apply decay/persistence effect
+            // Lower fallRate = more persistence (blur), higher fallRate = faster fade (no blur)
+            const fadeAlpha = 0.05 + ((21 - fallRate) / 20) * 0.7; // Range: 0.05 to 0.75
+            ctx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
             ctx.fillRect(0, 0, width, height);
 
             // Draw grid lines
@@ -1263,7 +1265,9 @@
 
             for (let i = 0; i < NUM_BANDS; i++) {
                 const angle = startAngle + (i + 0.5) * barAngle;
-                const barHeight = (heights[i] / 280) * maxBarHeight;
+                // Normalize bar height with square root to amplify smaller values
+                const normalizedHeight = Math.sqrt(heights[i] / 280);
+                const barHeight = normalizedHeight * maxBarHeight;
 
                 // Calculate bar corners
                 const innerRadius = baseRadius;
@@ -1312,8 +1316,10 @@
             const baseRadius = 80;
             const amplitudeScale = 40;
 
-            // Clear canvas
-            ctx.fillStyle = '#000000';
+            // Apply decay/persistence effect
+            // Lower fallRate = more persistence (blur), higher fallRate = faster fade (no blur)
+            const fadeAlpha = 0.05 + ((21 - fallRate) / 20) * 0.7; // Range: 0.05 to 0.75
+            ctx.fillStyle = `rgba(0, 0, 0, ${fadeAlpha})`;
             ctx.fillRect(0, 0, width, height);
 
             // Draw circular grid
