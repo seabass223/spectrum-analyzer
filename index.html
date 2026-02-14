@@ -372,6 +372,36 @@
             flex: 0 0 30%;
         }
 
+        /* Ensure all interactive elements have the same height */
+        .knob-container {
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toggle-switch-container {
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #control-bar {
+            height: 70px;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Ensure all value displays have consistent positioning */
+        .knob-value,
+        .toggle-labels {
+            min-height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .control-label {
             font-size: 9px;
             letter-spacing: 2px;
@@ -521,6 +551,7 @@
             color: #ffaa00;
             font-weight: bold;
             letter-spacing: 1px;
+            text-shadow: 0 0 8px rgba(0, 0, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.6);
         }
 
         /* Toggle Switch */
@@ -555,6 +586,11 @@
             box-shadow: 0 2px 4px rgba(255, 170, 0, 0.6);
         }
 
+        .display-mode-section {
+            margin-left: -45px;
+            margin-right: 5px;
+        }
+
         .toggle-labels {
             display: flex;
             justify-content: space-between;
@@ -568,6 +604,7 @@
         .toggle-labels span.active {
             color: #ffaa00;
             font-weight: bold;
+            text-shadow: 0 0 4px rgba(0, 0, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.6);
         }
 
         /* Canvas for oscilloscope */
@@ -646,9 +683,11 @@
             </div>
 
             <!-- Mode Toggle -->
-            <div class="control-section">
+            <div class="control-section display-mode-section">
                 <div class="control-label">Display Mode</div>
-                <div class="toggle-switch" id="mode-toggle"></div>
+                <div class="toggle-switch-container">
+                    <div class="toggle-switch" id="mode-toggle"></div>
+                </div>
                 <div class="toggle-labels">
                     <span id="label-spectrum" class="active">Spectrum</span>
                     <span id="label-scope">Scope</span>
